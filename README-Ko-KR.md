@@ -74,6 +74,14 @@ cp -r SKILL.md templates ~/.claude/skills/handoff/
 
 ## 사용 예시
 
+### Bare invocation
+
+```text
+handoff
+```
+
+추가 사용자 문장 없이 `handoff`만 호출해도 handoff 생성 또는 업데이트 요청으로 처리합니다.
+
 ### 1. 컨텍스트 윈도우가 거의 찼을 때
 
 ```text
@@ -93,6 +101,13 @@ cp -r SKILL.md templates ~/.claude/skills/handoff/
 ```
 
 위 프롬프트는 의도적으로 짧습니다. 구조는 스킬이 결정하므로, 작성자는 fresh-agent handoff가 필요하다는 사실만 명확히 전달하면 됩니다.
+
+## 출력 위치 정책
+
+- git 저장소에 root `HANDOFF.md`가 없으면 새 handoff는 `.handoff/HANDOFF.md`에 작성됩니다.
+- git 저장소에 기존 root `HANDOFF.md`가 있으면 호환성을 위해 그 파일을 읽고 분류한 뒤 업데이트합니다. migration은 사용자가 요청할 때만 합니다.
+- git 저장소에서 사용자가 root `HANDOFF.md`를 명시적으로 요청하면 root 출력은 허용되지만, local/session 정보 노출 가능성과 ignore 필요성을 알려야 합니다.
+- non-git workspace에서는 기본 출력 위치가 root `HANDOFF.md`입니다.
 
 ## 동작 방식
 
@@ -118,7 +133,8 @@ cp -r SKILL.md templates ~/.claude/skills/handoff/
           |
           v
   +-----------------------+
-  | 3. HANDOFF.md 작성    |
+  | 3. resolved handoff   |
+  | file 작성             |
   | 필수 섹션 기준        |
   | 순서 준수             |
   +-----------------------+
@@ -133,7 +149,7 @@ cp -r SKILL.md templates ~/.claude/skills/handoff/
 
 ## 출력 형식
 
-생성되는 `HANDOFF.md`는 항상 다음 섹션을 이 순서대로 포함해야 합니다.
+생성되는 handoff 파일은 다음 섹션을 이 순서대로 포함해야 합니다.
 
 1. `Task`
 2. `Current State`
@@ -166,7 +182,7 @@ agent-handoff-skill/
 
 ## Public Packaging 메모
 
-- 이 저장소는 스킬 패키징용입니다. 실제 runtime 산출물은 항상 `<active-project-root>/HANDOFF.md`에 작성됩니다.
+- 이 저장소는 스킬 패키징용입니다. 실제 runtime 산출물은 `SKILL.md`의 resolved destination에 작성되며, 기본적으로 이 패키징 저장소에 작성되는 것이 아닙니다.
 - 템플릿은 reference asset이며, runtime output 위치가 아닙니다.
 - `examples/`와 `evals/`가 포함되어 있다면 generic/public-safe 기준을 통과했기 때문입니다.
 

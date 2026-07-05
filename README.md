@@ -74,6 +74,14 @@ cp -r SKILL.md templates ~/.claude/skills/handoff/
 
 ## Usage
 
+### Bare invocation
+
+```text
+handoff
+```
+
+Bare skill invocation with no additional user text is enough to request a handoff.
+
 ### 1. Context window is nearly full
 
 ```text
@@ -93,6 +101,13 @@ Summarize the current state into a continuation-ready handoff, not a changelog.
 ```
 
 These prompts are intentionally short. The skill decides the structure; the author only needs to signal that a fresh-agent handoff is needed.
+
+## Destination Policy
+
+- In a git repository with no existing root `HANDOFF.md`, a new handoff is written to `.handoff/HANDOFF.md`.
+- In a git repository with an existing root `HANDOFF.md`, the skill reads, classifies, and updates that root file for compatibility unless migration is requested.
+- If the user explicitly requests root `HANDOFF.md` in a git repository, root output is allowed with leakage warning and ignore guidance.
+- In a non-git workspace, the default destination remains root `HANDOFF.md`.
 
 ## How It Works
 
@@ -118,7 +133,8 @@ These prompts are intentionally short. The skill decides the structure; the auth
              |
              v
   +-----------------------+
-  | 3. write HANDOFF.md   |
+  | 3. write resolved     |
+  | handoff file          |
   | using required        |
   | sections in order     |
   +-----------------------+
@@ -133,7 +149,7 @@ These prompts are intentionally short. The skill decides the structure; the auth
 
 ## Required Output Shape
 
-Every generated `HANDOFF.md` must include these sections, in order:
+Every generated handoff file must include these sections, in order:
 
 1. `Task`
 2. `Current State`
@@ -166,7 +182,7 @@ agent-handoff-skill/
 
 ## Public Packaging Notes
 
-- This repo packages the skill. Runtime handoff output is always written to `<active-project-root>/HANDOFF.md`.
+- This repo packages the skill. Runtime handoff output is written to the resolved destination from `SKILL.md`, not to this packaging repository by default.
 - The template is reference material; it is not where runtime handoff documents belong.
 - Example and eval artifacts are intentionally generic if shipped.
 

@@ -10,8 +10,14 @@ SECTION MAPPING — This template satisfies all 7 required sections from SKILL.m
   6. Next Steps              → "Next Steps"
   7. Context for Continuation → "Context for Continuation"
 
+DESTINATION NOTE:
+This file is the shipped template asset. Generated handoff output goes to the
+resolved handoff path from SKILL.md, such as .handoff/HANDOFF.md in a new git
+repository or root HANDOFF.md for non-git workspaces and supported root cases.
+Do not write generated handoff content into templates/HANDOFF.md.
+
 EXISTING FILE POLICY:
-If this file already exists, do NOT append the new document after the old one.
+If the resolved handoff file already exists, do NOT append the new document after the old one.
 Instead:
 1. CLASSIFY the existing file: obsolete (different task/completed) → replace fully.
    Active or stale continuation → evaluate per-section.

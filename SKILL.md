@@ -1,6 +1,6 @@
 ---
 name: handoff
-description: "Creates a HANDOFF.md document that captures progress, findings, and remaining work so a fresh agent can continue without context loss.\nTRIGGER when: the current agent cannot complete a task and needs to pass it to a new agent, context window is nearly full, or user explicitly requests a handoff.\nDO NOT TRIGGER when: the task is normal ongoing work with no agent transition needed."
+description: "Creates or updates a resolved HANDOFF.md continuation document that captures progress, findings, and remaining work so a fresh agent can continue without context loss.\nTRIGGER when: the current agent cannot complete a task and needs to pass it to a new agent, context window is nearly full, user explicitly requests a handoff, or the skill is invoked as bare `handoff`.\nDO NOT TRIGGER when: the task is normal ongoing work with no agent transition needed."
 ---
 
 # Handoff
@@ -15,6 +15,7 @@ Produce or update a single continuation document that lets a fresh agent resume 
 
 - The current agent cannot finish the task (context limit, session timeout, user handoff request).
 - The user explicitly asks for a handoff, context summary, or session transfer.
+- The bare skill invocation `handoff` appears with no additional user text. Treat that as an explicit request to create or update a handoff.
 - A multi-session task has reached a natural break point where continuation by a new agent is likely or planned.
 
 ## When NOT to Use
@@ -26,7 +27,7 @@ Produce or update a single continuation document that lets a fresh agent resume 
 
 ## Contract
 
-This skill operates under the following rules. Every invocation must satisfy all six points.
+This skill operates under the following rules. Every invocation must satisfy all points.
 
 ### 1. Trigger Conditions
 
@@ -36,20 +37,24 @@ See `## When to Use` above.
 
 See `## When NOT to Use` above.
 
-### 3. Output Destination
+### 3. Destination Resolution
 
-The generated handoff document is always written to:
+Before writing, resolve a single handoff destination for the active project or workspace.
 
-```
-<active-project-root>/HANDOFF.md
-```
+| Workspace state | Resolved handoff path | Required behavior |
+|-----------------|----------------------|-------------------|
+| Git repository, no existing root `HANDOFF.md`, and no explicit user request for root output | `.handoff/HANDOFF.md` | Create or update the local handoff under `.handoff/`. |
+| Git repository with an existing root `HANDOFF.md` | root `HANDOFF.md` | Read, classify, and update the root file for backward compatibility unless the user requests migration. |
+| Git repository with an explicit user request for root `HANDOFF.md` | root `HANDOFF.md` | Allow root output, but warn that handoffs may contain local/session detail and should stay ignored or otherwise kept out of public commits when appropriate. |
+| Non-git workspace | root `HANDOFF.md` | Create or update the handoff at the workspace root. |
 
-This is the project root of the repository or workspace the agent is working in.
+The resolved handoff path is the only generated output target. Vague wording such as "save it somewhere I can find it later" is not a destination override.
 
 **Never write generated handoff output into:**
 - The skill directory itself or its subdirectories
 - A `system-prompt-extraction/` folder (this is a known anti-pattern from an earlier version)
-- Any path outside the active project root
+- Any path outside the active project or workspace root
+- Arbitrary package, docs, examples, template, or scratch subdirectories that are not the resolved handoff path
 
 ### 4. Primary Audience
 
@@ -75,9 +80,9 @@ When evidence is unavailable or unverified, label it explicitly:
 
 Never fabricate or guess missing context. A labeled gap is always better than a fabricated assertion.
 
-### 6. Existing HANDOFF.md Handling
+### 6. Existing Resolved Handoff Handling
 
-When `<active-project-root>/HANDOFF.md` already exists, apply this three-step decision procedure:
+When the resolved handoff file already exists, apply this three-step decision procedure. In git repositories with an existing root `HANDOFF.md`, that root file is the resolved handoff file for compatibility unless the user requests migration.
 
 **Step 1: Classify the existing file.** Read it and determine which case applies:
 
@@ -111,13 +116,13 @@ If the section meets none of these criteria, discard it. Do not preserve it "jus
 | Asset Type | Location | Notes |
 |------------|----------|-------|
 | **Template** (reference structure) | `${SKILL_ROOT}/templates/HANDOFF.md` | Read-only scaffold the agent uses as a guide |
-| **Generated output** (actual handoff) | `<active-project-root>/HANDOFF.md` | The document the agent writes for the next agent |
+| **Generated output** (actual handoff) | Resolved handoff path from Destination Resolution | The document the agent writes for the next agent |
 
 The template is an asset shipped with the skill. The generated output is the handoff document the agent produces at runtime. They are separate things. Never write generated output into the template path.
 
 ## Required Sections
 
-Every generated `<active-project-root>/HANDOFF.md` must include these sections, in this order:
+Every generated handoff file at the resolved destination must include these sections, in this order:
 
 1. **Task** - What was the agent trying to accomplish. One or two sentences.
 2. **Current State** - Where things stand right now. What is done, what is in progress, what is blocked. Lead with this.
@@ -135,9 +140,9 @@ Supplementary sections beyond these seven (e.g., Verification Commands, Key File
 
 1. **Assess need.** Confirm a handoff is warranted (see trigger conditions). If not, stop.
 2. **Gather evidence.** Read recent files, git log, error output, and any existing planning documents. Do not guess.
-3. **Check for existing HANDOFF.md.** If one exists, follow the three-step procedure in Contract point 6: classify the file, evaluate each section for carry-forward, then compose fresh from the template.
+3. **Resolve the destination and check for an existing handoff.** Apply Destination Resolution first. If the resolved handoff file exists, follow the three-step procedure in Contract point 6: classify the file, evaluate each section for carry-forward, then compose fresh from the template.
 4. **Draft the document.** Follow the required sections above. Current State appears early so the next agent sees the status first. Mark unknowns as `[UNKNOWN]` or `[UNVERIFIED]`. Do not fabricate.
-5. **Write to `<active-project-root>/HANDOFF.md`.** Not the skill directory. Not a subdirectory. The project root.
+5. **Write to the resolved handoff path.** Not the skill directory. Not `system-prompt-extraction/`. Not an arbitrary path outside the destination policy.
 6. **Verify resumability.** Read back the written file. Apply the Resumability Criteria audit: confirm all six questions (where am I, what was done, what failed, what remains, how do I verify, what don't I know) have concrete answers. Confirm every factual claim is either evidenced or tagged `[UNKNOWN]`/`[UNVERIFIED]`. If any question is unanswered, revise before finalizing.
 
 ## Common Mistakes
@@ -145,19 +150,19 @@ Supplementary sections beyond these seven (e.g., Verification Commands, Key File
 | Mistake | Fix |
 |---------|-----|
 | Writing a narrative timeline ("First I did X, then I tried Y...") | Use structured sections. The next agent needs state, not story. |
-| Writing to the skill directory or `system-prompt-extraction/` | Always write to `<active-project-root>/HANDOFF.md`. |
-| Appending to an existing HANDOFF.md without classifying it | Follow the three-step procedure in Contract point 6: classify, evaluate per-section, compose fresh. |
+| Writing to the skill directory or `system-prompt-extraction/` | Resolve the destination from Destination Resolution, then write only to that handoff path. |
+| Appending to an existing handoff without classifying it | Follow the three-step procedure in Contract point 6: classify, evaluate per-section, compose fresh. |
 | Creating a "Legacy" or "Previous" section to dump old content | Integrate carried-forward facts into the appropriate template sections. No dumping grounds. |
 | Carrying forward a section verbatim without verifying accuracy | Re-check each fact before including it. Stale facts are worse than missing facts. |
 | Omitting evidence ("tests pass" without the command or output) | Include the command and a summary of the result. |
 | Fabricating or guessing missing information | Tag as `[UNKNOWN]` or `[UNVERIFIED]`. Gaps are fine. Lies are not. |
 | Including information the next agent can discover from the codebase | Omit it. The handoff is for continuation context, not a codebase tour. |
 | Leaving out the Next Steps section | This is the most important section for the next agent. Always include it. |
-| Mixing template structure with generated content | Template is read-only reference. Generated output goes to the project root. |
+| Mixing template structure with generated content | Template is read-only reference. Generated output goes to the resolved handoff path. |
 
 ## Resumability Criteria
 
-A handoff document is **resumable** if a fresh agent reading only that document (plus the codebase) can answer all six of these questions without guessing:
+A handoff document is **resumable** if a fresh agent reading only the resolved handoff file (plus the codebase) can answer all six of these questions without guessing:
 
 | # | Question | Where in the document | Pass condition |
 |---|----------|-----------------------|----------------|
@@ -191,4 +196,4 @@ Before declaring the handoff complete, verify: read the file back, confirm all r
 
 ### With session recovery
 
-When an agent starts a new session and finds `<active-project-root>/HANDOFF.md`, it should read that file first before examining the codebase. The handoff is the entry point for continuation.
+When an agent starts a new session and finds root `HANDOFF.md` or `.handoff/HANDOFF.md`, it should read the applicable handoff first before examining the rest of the codebase. The handoff is the entry point for continuation.
